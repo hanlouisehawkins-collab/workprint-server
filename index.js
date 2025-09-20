@@ -2,35 +2,35 @@ import express from "express";
 import fetch from "node-fetch";
 
 const app = express();
-const port = process.env.PORT || 5000;
-
 app.use(express.json());
 
-// Route for Softr or frontend to send chat messages
+// Health check (homepage)
+app.get("/", (req, res) => {
+  res.send("✅ Workprint server is running!");
+});
+
+// Chat route
 app.post("/chat", async (req, res) => {
   const { message } = req.body;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const threadResp = await fetch("https://api.openai.com/v1/threads", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4.1-mini",   // or whichever model your Custom Assistant uses
-        input: message
-      })
+      }
     });
 
-    const data = await response.json();
-    res.json({ reply: data.output[0].content[0].text });
+    const thread = await threadResp.json();
+    res.json({ reply: "Server received: " + message, thread });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: "Something went wrong" });
+    res.status(500).json({ error: "Something went wrong." });
   }
 });
 
-app.listen(port, () => {
-  console.log(`🚀 Server running on port ${port}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
