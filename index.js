@@ -1,10 +1,14 @@
-const cors = require("cors");
-app.use(cors({ origin: "*" }));
 const express = require("express");
 const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
+const cors = require("cors");
 
 const app = express();
+
+// enable CORS for browser calls (e.g., from Softr)
+app.use(cors({ origin: "*" }));
+
+// parse JSON bodies
 app.use(bodyParser.json());
 
 // Health check
