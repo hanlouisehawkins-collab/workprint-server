@@ -1,3 +1,5 @@
+const cors = require("cors");
+app.use(cors({ origin: "*" }));
 const express = require("express");
 const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
