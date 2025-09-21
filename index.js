@@ -10,13 +10,15 @@ app.use(cors({ origin: "*" }));
 
 // parse JSON bodies
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Health check
 app.get("/", (_req, res) => res.send("✅ Workprint server is running!"));
 
 // Chat -> calls your OpenAI Assistant via Assistants v2 (Threads & Runs)
 app.post("/chat", async (req, res) => {
-  const message = (req.body && req.body.message) || "";
+const message =
+  (req.body && (req.body.message || req.body.text)) || "";
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   const headers = {
