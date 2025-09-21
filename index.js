@@ -18,27 +18,33 @@ app.post("/chat", async (req, res) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+        "OpenAI-Beta": "assistants=v2"          // 👈 added
       },
       body: JSON.stringify({
-        // IMPORTANT: we reference your Assistant, not a plain model
-        assistant_id: process.env.ASSISTANT_ID,
+        model: "gpt-4.1-mini",                   // 👈 added (Responses API requires a model)
+        assistant_id: process.env.ASSISTANT_ID,  // uses your Assistant
         input: message
       }),
     });
 
     const data = await resp.json();
+
     if (!resp.ok) {
-      return res.status(502).json({
+      return res.status(resp.status).json({
         error: "Assistants request failed",
         detail: data,
       });
     }
 
-    // Try to return a simple text string if available, else the raw payload
-    const text =
-      (data.output?.[0]?.content?.[0]?.text) ||
-      (data.output_text) || null;
+    // Try to extract plain text; otherwise return full payload
+    let text = null;
+    if (Array.isArray(data.output) &&
+        data.output[0]?.content?.[0]?.type === "output_text") {
+      text = data.output[0].content[0].text;
+    } else if (typeof data.output_text === "string") {
+      text = data.output_text;
+    }
 
     return res.json(text ? { text, raw: data } : data);
   } catch (err) {
