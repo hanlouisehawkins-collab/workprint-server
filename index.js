@@ -1,24 +1,6 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const fetch = require("node-fetch");
-const cors = require("cors");
-
-const app = express();
-
-// enable CORS for browser calls (e.g., from Softr)
-app.use(cors({ origin: "*" }));
-
-// parse JSON bodies
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-
-// Health check
-app.get("/", (_req, res) => res.send("✅ Workprint server is running!"));
-
-// Chat -> calls your OpenAI Assistant via Assistants v2 (Threads & Runs)
+// Chat -> Assistants v2 (Threads & Runs) with thread reuse
 app.post("/chat", async (req, res) => {
-const message =
-  (req.body && (req.body.message || req.body.text)) || "";
+  const { message, thread_id } = req.body || {};
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   const headers = {
@@ -28,17 +10,21 @@ const message =
   };
 
   try {
-    // 1) Create a thread
-    const tResp = await fetch("https://api.openai.com/v1/threads", {
-      method: "POST",
-      headers,
-      body: JSON.stringify({}),
-    });
-    const thread = await tResp.json();
-    if (!tResp.ok) return res.status(502).json({ error: "create_thread_failed", detail: thread });
+    // 1) Use existing thread or create a new one
+    let threadId = thread_id;
+    if (!threadId) {
+      const tResp = await fetch("https://api.openai.com/v1/threads", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({}),
+      });
+      const thread = await tResp.json();
+      if (!tResp.ok) return res.status(502).json({ error: "create_thread_failed", detail: thread });
+      threadId = thread.id;
+    }
 
     // 2) Add the user message
-    const mResp = await fetch(`https://api.openai.com/v1/threads/${thread.id}/messages`, {
+    const mResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
       body: JSON.stringify({ role: "user", content: message }),
@@ -46,8 +32,8 @@ const message =
     const messageResp = await mResp.json();
     if (!mResp.ok) return res.status(502).json({ error: "add_message_failed", detail: messageResp });
 
-    // 3) Create a run with your Assistant
-    const rResp = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs`, {
+    // 3) Run the Assistant
+    const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
       method: "POST",
       headers,
       body: JSON.stringify({ assistant_id: process.env.ASSISTANT_ID }),
@@ -55,33 +41,33 @@ const message =
     const run = await rResp.json();
     if (!rResp.ok) return res.status(502).json({ error: "create_run_failed", detail: run });
 
-    // 4) Poll until completed (simple loop with timeout)
+    // 4) Poll until completed (quick loop)
     let runStatus = run;
     const started = Date.now();
     while (["queued", "in_progress", "cancelling"].includes(runStatus.status)) {
       if (Date.now() - started > 25000) {
-        return res.status(504).json({ error: "run_timeout", detail: runStatus });
+        return res.status(504).json({ error: "run_timeout", thread_id: threadId, detail: runStatus });
       }
       await new Promise(r => setTimeout(r, 1200));
-      const sResp = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs/${run.id}`, {
+      const sResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${run.id}`, {
         method: "GET",
         headers,
       });
       runStatus = await sResp.json();
-      if (!sResp.ok) return res.status(502).json({ error: "poll_run_failed", detail: runStatus });
+      if (!sResp.ok) return res.status(502).json({ error: "poll_run_failed", thread_id: threadId, detail: runStatus });
     }
 
     if (runStatus.status !== "completed") {
-      return res.status(502).json({ error: "run_not_completed", detail: runStatus });
+      return res.status(502).json({ error: "run_not_completed", thread_id: threadId, detail: runStatus });
     }
 
-    // 5) Read latest assistant message
-    const listResp = await fetch(`https://api.openai.com/v1/threads/${thread.id}/messages?order=desc&limit=5`, {
+    // 5) Read the latest assistant message
+    const listResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?order=desc&limit=5`, {
       method: "GET",
       headers,
     });
     const list = await listResp.json();
-    if (!listResp.ok) return res.status(502).json({ error: "list_messages_failed", detail: list });
+    if (!listResp.ok) return res.status(502).json({ error: "list_messages_failed", thread_id: threadId, detail: list });
 
     const assistantMsg = (list.data || []).find(m => m.role === "assistant");
     let text = null;
@@ -90,13 +76,10 @@ const message =
       text = textPart?.text?.value || null;
     }
 
-    return res.json(text ? { text, raw: assistantMsg } : { raw: assistantMsg || list });
+    // Return text + thread_id so the client can keep chatting in the same thread
+    return res.json({ text, thread_id: threadId, raw: assistantMsg || list });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "server_error", detail: String(err) });
   }
 });
-
-// Start
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on ${PORT}`));
