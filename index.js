@@ -47,12 +47,31 @@ app.post("/chat", async (req, res) => {
     const msgJson = await mResp.json();
     if (!mResp.ok) return res.status(502).json({ error: "add_message_failed", thread_id: threadId, detail: msgJson });
 
-    // 3) Run the Assistant
-    const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ assistant_id: process.env.ASSISTANT_ID }),
-    });
+// 3) Run the Assistant (STRICT runtime clamp)
+const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
+  method: "POST",
+  headers,
+  body: JSON.stringify({
+    assistant_id: process.env.ASSISTANT_ID,
+    instructions: [
+      // HARD RULES — mirror your V3 intent
+      "You are the Workprint Quiz Assistant.",
+      "Use ONLY the quiz script and results content from the attached Workprint knowledge. Do NOT reword or invent.",
+      "Ask EXACTLY ONE question per turn. Never show multiple questions at once.",
+      "Accept only A, B, C, or D as answers. If anything else is provided, say: 'Please answer with A, B, C, or D.' and repeat the SAME question.",
+      "Never reveal results until all 18 questions are answered.",
+      "Never explain scoring during the quiz.",
+      "Output format for questions (exact newlines):",
+      "Question {n} of 18",
+      "<question text exactly as in the script>",
+      "A) <option>",
+      "B) <option>",
+      "C) <option>",
+      "D) <option>",
+      "Reply with A, B, C, or D."
+    ].join("\n"),
+  }),
+});
     const run = await rResp.json();
     if (!rResp.ok) return res.status(502).json({ error: "create_run_failed", thread_id: threadId, detail: run });
 
