@@ -6,16 +6,170 @@ const cors = require("cors");
 
 // --- app setup ---
 const app = express();
-app.use(cors({ origin: "*" }));            // allow Softr / browser calls
-app.use(bodyParser.json());                 // JSON bodies
+app.use(cors({ origin: "*" }));
+app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// --- in-memory per-thread progress (resets on redeploy) ---
+const progress = new Map(); // threadId -> { nextIdx: number }  (0..18, where 0=Q1 ... 18=Q19 sentinel)
+
+// --- VERBATIM TEXT BLOCKS (edit these strings, not the code) ---
+const WELCOME = `Welcome to Workprint
+(Discover your unique Workprint Profile)
+
+What’s this quiz?
+This quick quiz helps you find your Workprint Profile — the way you work best, connect with others, and get results.
+
+How long will it take?
+About 5 minutes — no right or wrong answers. Just pick what feels most true.
+
+What you’ll get at the end:
+- Your Workprint Family & Profile
+- A breakdown of your top traits
+- Best pairings for collaboration
+- A Grounding Quote for Growth chosen for you
+- Option to download your result via SharePoint
+
+When you’re ready, let’s go.`;
+
+// Put your exact 18 questions here (A–D) verbatim.
+// Q1 is index 0, Q18 is index 17.
+const QUESTIONS = [
+`Question 1 of 18
+You’re starting your workday. What’s your first move?
+A) Open the to-do list or calendar, I like structure early
+B) Scan messages and jump into whatever feels urgent
+C) Ease into it, I need time to warm up
+D) Check in with the team or get a quick sense of what’s happening`,
+`Question 2 of 18
+How do you react to last-minute changes in plans?
+A) No problem, I can roll with it
+B) Frustrating, but I’ll adjust
+C) I prefer sticking to the original plan
+D) I quietly pivot and keep things moving`,
+`Question 3 of 18
+When giving feedback to a peer, what’s most true?
+A) I’m direct and straight to the point
+B) I soften things, I don’t want to hurt feelings
+C) I try to read the room and adjust
+D) I overthink it and sometimes delay saying anything`,
+`Question 4 of 18
+What do you do when a project slows down?
+A) I take initiative and try to get it back on track
+B) I focus on my part and wait for others to lead
+C) I ask the team what’s going on and suggest a new approach
+D) I keep doing what I can, even if others aren’t`,
+`Question 5 of 18
+How do you typically make progress on a task?
+A) I plan out the steps before I begin
+B) I take action quickly and adapt as I go
+C) I prefer to check in with others first
+D) I rely on deadlines to give me direction`,
+`Question 6 of 18
+A tense conversation is brewing. What’s your move?
+A) I initiate it, best to deal with it early
+B) I let things cool off before saying anything
+C) I avoid it unless absolutely necessary
+D) I try to mediate and keep the tone positive`,
+`Question 7 of 18
+How would your team describe your work pace?
+A) Fast-moving and full of energy
+B) Calm and consistent
+C) Flexible depending on the day
+D) Focused, methodical, and steady`,
+`Question 8 of 18
+A new idea pops up mid-project. What do you do?
+A) If it’s good, I’ll shift things to include it
+B) I stick to the plan, changes cause issues
+C) I flag it, but assess how disruptive it’ll be
+D) I immediately want to test or explore it`,
+`Question 9 of 18
+What’s your style when working in a team?
+A) I like to keep people aligned and connected
+B) I tend to lead or move things forward
+C) I keep to myself unless someone needs me
+D) I play a steady support role and hold things down`,
+`Question 10 of 18
+When deadlines stack up, what happens?
+A) I get more focused, I don’t let things slide
+B) I triage and communicate what I’ll hit
+C) I do what I can and stay adaptable
+D) I stress out but usually pull it together last-minute`,
+`Question 11 of 18
+If something upsets you at work, how do you handle it?
+A) I take a pause, then respond constructively
+B) I bottle it up and focus on the task
+C) I might vent to someone I trust
+D) I address it quickly so it doesn’t simmer`,
+`Question 12 of 18
+What gives you the most satisfaction at work?
+A) Finishing something with no loose ends
+B) Solving problems creatively
+C) Feeling connected and part of something
+D) Moving fast and seeing immediate results`,
+`Question 13 of 18
+When new projects land, what’s your mindset?
+A) Let's map it out before we move
+B) Energy, ideas, and momentum
+C) I'll adapt to whatever’s needed
+D) I'm calm and ready to support`,
+`Question 14 of 18
+What happens when things go off track?
+A) I step in — someone's got to get it moving again
+B) I steady the ship and try to reduce stress
+C) I assess what needs to shift, then adjust
+D) I push forward, but feel the tension build`,
+`Question 15 of 18
+What’s your approach to deadlines?
+A) I manage them early so I don’t feel pressure later
+B) They help me focus and get things done
+C) I’m flexible — I respond to shifting timelines
+D) I wait until it’s urgent, then act fast`,
+`Question 16 of 18
+What frustrates you most in others?
+A) Unclear communication
+B) Inflexibility or closed-mindedness
+C) Lack of follow-through
+D) Overthinking without action`,
+`Question 17 of 18
+What do you bring to a team that others rely on?
+A) Steady delivery and commitment
+B) Energy, ideas, and momentum
+C) Calm, big-picture thinking
+D) Openness, support, and connection`,
+`Question 18 of 18
+When you get feedback, what’s your response?
+A) I reflect and try to improve
+B) I appreciate honesty — even if it’s blunt
+C) I take it personally at first, then process it later
+D) I look for the emotion underneath the message`
+];
 
 // --- health check ---
 app.get("/", (_req, res) => res.send("✅ Workprint server is running!"));
 
-// --- Chat -> Assistants v2 (Threads & Runs) with thread reuse ---
+// --- helper: decide what verbatim block to show this turn (optional state machine) ---
+function getDisplayBlockForThread(threadId) {
+  const state = progress.get(threadId);
+  if (!state) {
+    // first time for this thread: show welcome, set nextIdx = 0 (Q1)
+    progress.set(threadId, { nextIdx: 0 });
+    return WELCOME;
+  }
+  const idx = state.nextIdx ?? 0;
+  if (idx < QUESTIONS.length) {
+    // show current question and advance pointer
+    const block = QUESTIONS[idx];
+    progress.set(threadId, { nextIdx: idx + 1 });
+    return block;
+  }
+  // after Q18, return null -> assistant will produce results from its own logic
+  return null;
+}
+
+// --- Chat -> Assistants v2 with optional server-enforced verbatim block ---
 app.post("/chat", async (req, res) => {
-  const { message, thread_id } = req.body || {};
+  const { message, thread_id, display_block } = req.body || {};
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   const headers = {
@@ -38,7 +192,7 @@ app.post("/chat", async (req, res) => {
       threadId = thread.id;
     }
 
-    // 2) Add the user message
+    // 2) Add user message
     const mResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages`, {
       method: "POST",
       headers,
@@ -47,35 +201,37 @@ app.post("/chat", async (req, res) => {
     const msgJson = await mResp.json();
     if (!mResp.ok) return res.status(502).json({ error: "add_message_failed", thread_id: threadId, detail: msgJson });
 
-// 3) Run the Assistant (STRICT runtime clamp)
-const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
-  method: "POST",
-  headers,
-  body: JSON.stringify({
-    assistant_id: process.env.ASSISTANT_ID,
-    instructions: [
-      // HARD RULES — mirror your V3 intent
-      "You are the Workprint Quiz Assistant.",
-      "Use ONLY the quiz script and results content from the attached Workprint knowledge. Do NOT reword or invent.",
-      "Ask EXACTLY ONE question per turn. Never show multiple questions at once.",
-      "Accept only A, B, C, or D as answers. If anything else is provided, say: 'Please answer with A, B, C, or D.' and repeat the SAME question.",
-      "Never reveal results until all 18 questions are answered.",
-      "Never explain scoring during the quiz.",
-      "Output format for questions (exact newlines):",
-      "Question {n} of 18",
-      "<question text exactly as in the script>",
-      "A) <option>",
-      "B) <option>",
-      "C) <option>",
-      "D) <option>",
-      "Reply with A, B, C, or D."
-    ].join("\n"),
-  }),
-});
+    // 3) Build run payload, optionally injecting verbatim display text
+    const runPayload = {
+      assistant_id: process.env.ASSISTANT_ID,
+    };
+
+    // (A) If caller provided a display_block explicitly, use it
+    let block = display_block;
+
+    // (B) Otherwise, have the server decide (welcome -> Q1..Q18 -> results)
+    if (!block) {
+      block = getDisplayBlockForThread(threadId);
+    }
+
+    // If we have a block, force the model to echo it verbatim in code fences
+    if (block && block.length > 0) {
+      runPayload.instructions =
+        "Reply with EXACTLY the following text inside a single triple-backtick code block, and nothing else:\n\n" +
+        block;
+    }
+    // If no block (after Q18), we don't set instructions — the assistant will output the results per its own rules.
+
+    // 4) Create the run
+    const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(runPayload),
+    });
     const run = await rResp.json();
     if (!rResp.ok) return res.status(502).json({ error: "create_run_failed", thread_id: threadId, detail: run });
 
-    // 4) Poll until completed
+    // 5) Poll until completed
     let runStatus = run;
     const started = Date.now();
     while (["queued", "in_progress", "cancelling"].includes(runStatus.status)) {
@@ -83,22 +239,29 @@ const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, 
         return res.status(504).json({ error: "run_timeout", thread_id: threadId, detail: runStatus });
       }
       await new Promise(r => setTimeout(r, 1200));
-      const sResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${run.id}`, { method: "GET", headers });
+      const sResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs/${run.id}`, {
+        method: "GET",
+        headers,
+      });
       runStatus = await sResp.json();
-      if (!sResp.ok) return res.status(502).json({ error: "poll_run_failed", thread_id: threadId, detail: runStatus });
+      if (!sResp.ok) {
+        return res.status(502).json({ error: "poll_run_failed", thread_id: threadId, detail: runStatus });
+      }
     }
 
     if (runStatus.status !== "completed") {
       return res.status(502).json({ error: "run_not_completed", thread_id: threadId, detail: runStatus });
     }
 
-    // 5) Read latest assistant message
+    // 6) Read latest assistant message
     const listResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/messages?order=desc&limit=5`, {
       method: "GET",
       headers,
     });
     const list = await listResp.json();
-    if (!listResp.ok) return res.status(502).json({ error: "list_messages_failed", thread_id: threadId, detail: list });
+    if (!listResp.ok) {
+      return res.status(502).json({ error: "list_messages_failed", thread_id: threadId, detail: list });
+    }
 
     const assistantMsg = (list.data || []).find(m => m.role === "assistant");
     let text = null;
