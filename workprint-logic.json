@@ -13,3 +13,13 @@ D → Com
 # B → EC
 # C → Com, EC
 # D → EC, CR
+# Q4 mapping
+# A → In
+# B → FT
+# C → Com, Ad
+# D → FT, In
+# Q5 mapping
+# A → ES
+# B → In, Ad
+# C → Com
+# D → FT
