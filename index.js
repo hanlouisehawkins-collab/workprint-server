@@ -4,6 +4,9 @@ const bodyParser = require("body-parser");
 const fetch = require("node-fetch");
 const cors = require("cors");
 
+// 👇 NEW: bring in the scoring engine
+const { newCounters, applyChoice, getProfile } = require("./workprint-engine");
+
 // --- app setup ---
 const app = express();
 app.use(cors({ origin: "*" }));
@@ -163,7 +166,7 @@ function getDisplayBlockForThread(threadId) {
     progress.set(threadId, { nextIdx: idx + 1 });
     return block;
   }
-  // after Q18, return null -> assistant will produce results from its own logic
+  // after Q18, return null -> assistant will produce results from its own logic (for now)
   return null;
 }
 
@@ -202,9 +205,7 @@ app.post("/chat", async (req, res) => {
     if (!mResp.ok) return res.status(502).json({ error: "add_message_failed", thread_id: threadId, detail: msgJson });
 
     // 3) Build run payload, optionally injecting verbatim display text
-    const runPayload = {
-      assistant_id: process.env.ASSISTANT_ID,
-    };
+    const runPayload = { assistant_id: process.env.ASSISTANT_ID };
 
     // (A) If caller provided a display_block explicitly, use it
     let block = display_block;
@@ -220,7 +221,7 @@ app.post("/chat", async (req, res) => {
         "Reply with EXACTLY the following text inside a single triple-backtick code block, and nothing else:\n\n" +
         block;
     }
-    // If no block (after Q18), we don't set instructions — the assistant will output the results per its own rules.
+    // If no block (after Q18), we don't set instructions — the assistant will output the results per its own rules (we'll switch this to server logic later).
 
     // 4) Create the run
     const rResp = await fetch(`https://api.openai.com/v1/threads/${threadId}/runs`, {
@@ -275,6 +276,34 @@ app.post("/chat", async (req, res) => {
     console.error(err);
     return res.status(500).json({ error: "server_error", detail: String(err) });
   }
+});
+
+// --- TEMP TEST ROUTES --------------------------------------------------
+
+// Quick sample: adds Q1:A, Q2:D, Q3:B, returns scores + profile
+app.get("/test", (_req, res) => {
+  const s = newCounters();
+  applyChoice(s, 1, "A"); // ES+1, FT+1
+  applyChoice(s, 2, "D"); // Ad+1, ES+1
+  applyChoice(s, 3, "B"); // EC+1
+  const profile = getProfile(s); // likely "Architect" via fallback (ES highest)
+  res.json({ scores: s, profile });
+});
+
+// Simulate a full run with a string of answers (A–D), e.g. ?answers=ACAB... (18 chars)
+// You can also include commas or spaces; they’ll be ignored.
+app.get("/simulate", (req, res) => {
+  const raw = String(req.query.answers || "").toUpperCase();
+  const letters = raw.replace(/[^ABCD]/g, ""); // keep only A/B/C/D
+  if (!letters) return res.status(400).json({ error: "provide answers=A..D string" });
+
+  const s = newCounters();
+  // Apply up to 18 answers (Q1..Q18). Extra letters are ignored. Fewer than 18 is OK for testing.
+  for (let i = 0; i < Math.min(18, letters.length); i++) {
+    applyChoice(s, i + 1, letters[i]);
+  }
+  const profile = getProfile(s);
+  res.json({ answers_used: letters.slice(0, 18), scores: s, profile });
 });
 
 // --- start server ---
