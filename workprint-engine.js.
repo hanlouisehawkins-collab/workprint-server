@@ -49,8 +49,21 @@ function getProfile(scores) {
   if (EC >= 4 && FT >= 3 && Com <= 3) return "Anchor";
   if (Ad >= 4 && EC >= 3) return "Shapeshifter";
   if (EC >= 3 && (ES >= 3 || FT >= 3) && !(En >= 2) && !(Ad >= 4)) return "Strategist";
-  return "Unmatched"; // safety net
+    // Fallback: pick the profile whose strongest traits are highest
+  const topTrait = Object.keys(scores).reduce((a,b) => scores[a] > scores[b] ? a : b);
+  const traitToProfile = {
+    En: "Firestarter",
+    In: "Spark",
+    FT: "Closer",
+    ES: "Architect",
+    Com: "Connector",
+    EC: "Anchor",
+    Ad: "Shapeshifter",
+    CR: "Strategist",
+  };
+  return traitToProfile[topTrait] || "Strategist";
 }
+
 
 module.exports = { newCounters, applyChoice, getProfile };
 
