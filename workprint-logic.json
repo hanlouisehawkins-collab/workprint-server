@@ -1,25 +1,109 @@
 {"En":0,"In":0,"Ad":0,"FT":0,"ES":0,"Com":0,"CR":0,"EC":0}
-A → ES, FT
-B → En, In
-C → EC
-D → Com
+
+# Q1 mapping
+# A → ES, FT
+# B → En, In
+# C → EC
+# D → Com
+
 # Q2 mapping
 # A → Ad
 # B → Ad
 # C → ES, FT
 # D → Ad, ES
+
 # Q3 mapping
 # A → Com, CR
 # B → EC
 # C → Com, EC
 # D → EC, CR
+
 # Q4 mapping
 # A → In
 # B → FT
 # C → Com, Ad
 # D → FT, In
+
 # Q5 mapping
 # A → ES
 # B → In, Ad
 # C → Com
 # D → FT
+
+# Q6 mapping
+# A → CR
+# B → EC
+# C → CR
+# D → Com, CR
+
+# Q7 mapping
+# A → En
+# B → En, EC
+# C → Ad
+# D → ES, FT
+
+# Q8 mapping
+# A → Ad
+# B → ES
+# C → EC, ES
+# D → In, En
+
+# Q9 mapping
+# A → Com
+# B → In
+# C → EC
+# D → FT
+
+# Q10 mapping
+# A → FT
+# B → Com, EC
+# C → Ad
+# D → En
+
+# Q11 mapping
+# A → EC
+# B → FT
+# C → Com
+# D → CR
+
+# Q12 mapping
+# A → FT
+# B → Ad
+# C → Com
+# D → En, In
+
+# Q13 mapping
+# A → ES
+# B → En
+# C → Ad
+# D → EC
+
+# Q14 mapping
+# A → In
+# B → EC
+# C → Ad
+# D → FT
+
+# Q15 mapping
+# A → ES, FT
+# B → In, FT
+# C → Ad
+# D → En
+
+# Q16 mapping
+# A → Com
+# B → Ad
+# C → FT
+# D → In
+
+# Q17 mapping
+# A → FT
+# B → En, In
+# C → EC
+# D → Com
+
+# Q18 mapping
+# A → EC
+# B → CR
+# C → EC
+# D → Com
