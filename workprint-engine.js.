@@ -5,6 +5,10 @@ const mapping = {
   1: { A: ["ES","FT"], B: ["En","In"], C: ["EC"], D: ["Com"] },
   2: { A: ["Ad"], B: ["Ad"], C: ["ES","FT"], D: ["Ad","ES"] },
   3: { A: ["Com","CR"], B: ["EC"], C: ["Com","EC"], D: ["EC","CR"] },
+  4: { A: ["In"], B: ["FT"], C: ["Com","Ad"], D: ["FT","In"] },
+  5: { A: ["ES"], B: ["In","Ad"], C: ["Com"], D: ["FT"] },
+  6: { A: ["CR"], B: ["EC"], C: ["CR"], D: ["Com","CR"] },
+  7: { A: ["En"], B: ["En","EC"], C: ["Ad"], D: ["ES","FT"] },
 };
 
 function newCounters() {
