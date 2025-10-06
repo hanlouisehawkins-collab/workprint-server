@@ -3,6 +3,8 @@
 
 const mapping = {
   1: { A: ["ES","FT"], B: ["En","In"], C: ["EC"], D: ["Com"] },
+  2: { A: ["Ad"], B: ["Ad"], C: ["ES","FT"], D: ["Ad","ES"] },
+  3: { A: ["Com","CR"], B: ["EC"], C: ["Com","EC"], D: ["EC","CR"] },
 };
 
 function newCounters() {
