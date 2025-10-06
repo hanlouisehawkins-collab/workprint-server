@@ -9,6 +9,17 @@ const mapping = {
   5: { A: ["ES"], B: ["In","Ad"], C: ["Com"], D: ["FT"] },
   6: { A: ["CR"], B: ["EC"], C: ["CR"], D: ["Com","CR"] },
   7: { A: ["En"], B: ["En","EC"], C: ["Ad"], D: ["ES","FT"] },
+  8: { A: ["Ad"], B: ["ES"], C: ["EC","ES"], D: ["In","En"] },
+  9: { A: ["Com"], B: ["In"], C: ["EC"], D: ["FT"] },
+ 10: { A: ["FT"], B: ["Com","EC"], C: ["Ad"], D: ["En"] },
+ 11: { A: ["EC"], B: ["FT"], C: ["Com"], D: ["CR"] },
+ 12: { A: ["FT"], B: ["Ad"], C: ["Com"], D: ["En","In"] },
+ 13: { A: ["ES"], B: ["En"], C: ["Ad"], D: ["EC"] },
+ 14: { A: ["In"], B: ["EC"], C: ["Ad"], D: ["FT"] },
+ 15: { A: ["ES","FT"], B: ["In","FT"], C: ["Ad"], D: ["En"] },
+ 16: { A: ["Com"], B: ["Ad"], C: ["FT"], D: ["In"] },
+ 17: { A: ["FT"], B: ["En","In"], C: ["EC"], D: ["Com"] },
+ 18: { A: ["EC"], B: ["CR"], C: ["EC"], D: ["Com"] },
 };
 
 function newCounters() {
