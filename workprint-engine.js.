@@ -36,7 +36,23 @@ function applyChoice(state, qNumber, answer) {
 }
 
 // Export for later use in index.js
-module.exports = { newCounters, applyChoice };
+function getProfile(scores) {
+  const En = scores.En, In = scores.In, Ad = scores.Ad,
+        FT = scores.FT, ES = scores.ES, Com = scores.Com,
+        CR = scores.CR, EC = scores.EC;
+
+  if (En >= 3 && In >= 3 && (Ad >= 2 || CR >= 2)) return "Firestarter";
+  if (En >= 3 && In <= 2 && (Ad >= 2 || Com >= 2)) return "Spark";
+  if (FT >= 4 && ES >= 3) return "Closer";
+  if (ES >= 3 && FT >= 3 && EC >= 2) return "Architect";
+  if (Com >= 4 && EC >= 3 && !(In >= 3) && !(FT >= 3 && EC >= 4 && Com <= 3)) return "Connector";
+  if (EC >= 4 && FT >= 3 && Com <= 3) return "Anchor";
+  if (Ad >= 4 && EC >= 3) return "Shapeshifter";
+  if (EC >= 3 && (ES >= 3 || FT >= 3) && !(En >= 2) && !(Ad >= 4)) return "Strategist";
+  return "Unmatched"; // safety net
+}
+
+module.exports = { newCounters, applyChoice, getProfile };
 
 /* Quick self-test: run `node workprint-engine.js` in the Replit shell:
    Expected output after choosing Q1:A → ES+1 and FT+1
