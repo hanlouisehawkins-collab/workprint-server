@@ -1,0 +1,15 @@
+{"En":0,"In":0,"Ad":0,"FT":0,"ES":0,"Com":0,"CR":0,"EC":0}
+A → ES, FT
+B → En, In
+C → EC
+D → Com
+# Q2 mapping
+# A → Ad
+# B → Ad
+# C → ES, FT
+# D → Ad, ES
+# Q3 mapping
+# A → Com, CR
+# B → EC
+# C → Com, EC
+# D → EC, CR
