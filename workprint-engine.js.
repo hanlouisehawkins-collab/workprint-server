@@ -1,0 +1,31 @@
+// workprint-engine.js
+// Minimal scoring engine — we’ll expand it question by question.
+
+const mapping = {
+  1: { A: ["ES","FT"], B: ["En","In"], C: ["EC"], D: ["Com"] },
+};
+
+function newCounters() {
+  return { En:0, In:0, Ad:0, FT:0, ES:0, Com:0, CR:0, EC:0 };
+}
+
+function applyChoice(state, qNumber, answer) {
+  const qMap = mapping[qNumber];
+  if (!qMap) return state;                    // unknown question → no change
+  const addTraits = qMap[ String(answer).toUpperCase() ];
+  if (!addTraits) return state;               // unknown answer → no change
+  addTraits.forEach(trait => { state[trait]++ });
+  return state;
+}
+
+// Export for later use in index.js
+module.exports = { newCounters, applyChoice };
+
+/* Quick self-test: run `node workprint-engine.js` in the Replit shell:
+   Expected output after choosing Q1:A → ES+1 and FT+1
+*/
+if (require.main === module) {
+  const s = newCounters();
+  applyChoice(s, 1, "A");
+  console.log(s);
+}
